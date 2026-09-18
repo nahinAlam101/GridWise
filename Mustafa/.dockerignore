@@ -1,0 +1,9 @@
+*
+!Dockerfile
+!requirements.txt
+!requirements.lock
+!main.py
+!gridwise/
+!gridwise/**
+gridwise/**/__pycache__
+gridwise/**/*.pyc
