@@ -48,6 +48,10 @@ Environment variables take precedence over `.env`.
 | `LLM_MAX_ATTEMPTS` | `2` | Maximum attempts, including any output repair |
 | `LLM_MAX_OUTPUT_TOKENS` | `1800` | Output limit; supported range 256–4096 |
 | `PORT` | `8000` | HTTP service port |
+| `DATABASE_URL` | empty outside Docker | SQLAlchemy PostgreSQL connection URL |
+| `POSTGRES_DB` | `gridwise` | Compose database name |
+| `POSTGRES_USER` | `gridwise` | Compose database user |
+| `POSTGRES_PASSWORD` | none | Compose database password; set it in `.env` |
 
 The interpreter has a hard 22-second budget across attempts; the API has a 28-second deadline. Provider/model choice and quota determine live latency. The guide's 5-second p95 target has **not** been verified against a live provider here.
 
@@ -127,7 +131,9 @@ docker build -t gridwise:1.0.0 .
 docker run --rm --name gridwise -p 8000:8000 --env-file .env gridwise:1.0.0
 ```
 
-Or run `docker compose up --build -d`. The image runs as an unprivileged user, binds to `0.0.0.0`, and excludes `.env`, tests, sample answers, and local development files. Its health check uses `PORT`.
+Or run `cp .env.example .env`, replace `POSTGRES_PASSWORD` with a local secret, and run `docker compose up --build -d`. Compose starts PostgreSQL as `db`, waits for its health check, and stores database files in the persistent `gridwise-db-data` volume. The application connects to `db`, not `localhost`. The image runs as an unprivileged user, binds to `0.0.0.0`, and excludes `.env`, tests, sample answers, and local development files. Its health check uses `PORT`.
+
+The application creates the required tables automatically on startup. Successful verified optimization runs are stored with their scenario, battery configuration, operator notes, validated directives, and hourly plan. Sample data is not seeded automatically.
 
 For the mandatory pullable fallback, publish a versioned image to your registry, then replace `YOUR_ACCOUNT` in the commands below with the actual registry namespace:
 

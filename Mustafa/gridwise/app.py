@@ -5,14 +5,17 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from .database import close_database, initialize_database
 from .interpreter import InterpreterError, LLMInterpreter
 from .optimizer import InfeasibleSchedule, OptimizationError, optimize
+from .repository import save_completed_run
 from .replay import ReplayError, replay
 from .validation import DirectiveValidationError, Scenario, validate_directives
 
@@ -25,13 +28,17 @@ def error(status: int, code: str, message: str) -> JSONResponse:
 
 
 def create_app(interpreter=None) -> FastAPI:
+    llm_required = os.getenv("LLM_REQUIRED", "true").strip().lower() not in {"0", "false", "no"}
+
     @asynccontextmanager
     async def lifespan(application: FastAPI):
+        initialize_database()
         application.state.interpreter = interpreter or LLMInterpreter()
         try:
             yield
         finally:
             await application.state.interpreter.close()
+            close_database()
 
     application = FastAPI(
         title="GridWise",
@@ -47,7 +54,7 @@ def create_app(interpreter=None) -> FastAPI:
 
     @application.get("/health", responses={503: {"description": "LLM configuration is missing"}})
     async def health(request: Request):
-        if not request.app.state.interpreter.configured:
+        if llm_required and not request.app.state.interpreter.configured:
             return error(503, "not_ready", "Configure the language model before sending optimization requests.")
         return {"status": "ok"}
 
@@ -64,6 +71,10 @@ def create_app(interpreter=None) -> FastAPI:
                 directives = validate_directives(data, directives)
                 response = await run_in_threadpool(optimize, data, directives)
                 replay(data, response)
+                try:
+                    await run_in_threadpool(save_completed_run, data, directives, response)
+                except Exception as exc:
+                    logger.error("Database persistence failed (%s)", type(exc).__name__)
                 return response
         except InfeasibleSchedule:
             return error(422, "infeasible_schedule", "The interpreted constraints have no feasible 24-hour schedule.")
