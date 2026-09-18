@@ -47,6 +47,7 @@ Environment variables take precedence over `.env`.
 | `LLM_TIMEOUT_SECONDS` | `10` | Per-provider-request timeout |
 | `LLM_MAX_ATTEMPTS` | `2` | Maximum attempts, including any output repair |
 | `LLM_MAX_OUTPUT_TOKENS` | `1800` | Output limit; supported range 256–4096 |
+| `LLM_REQUIRED` | `true` | Set to `false` for database-only startup without an LLM key |
 | `PORT` | `8000` | HTTP service port |
 | `DATABASE_URL` | empty outside Docker | SQLAlchemy PostgreSQL connection URL |
 | `POSTGRES_DB` | `gridwise` | Compose database name |
